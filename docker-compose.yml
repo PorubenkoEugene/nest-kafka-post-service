@@ -1,0 +1,61 @@
+version: "3"
+services:
+  zookeeper:
+    image: wurstmeister/zookeeper:3.4.6
+    container_name: kafka-nodejs-example-zookeeper
+    ports:
+      - 2181:2181
+  kafka:
+    image: wurstmeister/kafka:2.11-1.1.0
+    container_name: kafka-nodejs-example-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    ports:
+      - 9092:9092
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  database:
+    image: postgres:10.4-alpine
+    container_name: kafka-nodejs-example-database
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: posts
+    ports:
+      - 8000:5432
+
+  producer:
+    build: ./client
+    container_name: kafka-nodejs-example-producer
+    command: sh -c "dockerize -wait tcp://zookeeper:2181 -wait tcp://kafka:9092 -wait tcp://database:5432 npm start"
+    depends_on:
+      - zookeeper
+      - kafka
+      - database
+    environment:
+      PGHOST: database
+      PGPORT: 5432
+      PGUSER: user
+      PGDATABASE: posts
+      PGPASSWORD: password
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    ports:
+      - 3030:3030
+  consumer:
+    build: ./posts-service
+    container_name: kafka-nodejs-example-consumer
+    command: sh -c "dockerize -wait tcp://zookeeper:2181 -wait tcp://kafka:9092 -wait tcp://database:5432 npm start"
+    depends_on:
+      - zookeeper
+      - kafka
+      - database
+    environment:
+      PGHOST: database
+      PGPORT: 5432
+      PGUSER: user
+      PGDATABASE: posts
+      PGPASSWORD: password
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
